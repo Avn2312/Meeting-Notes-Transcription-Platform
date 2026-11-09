@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -220,7 +221,7 @@ def delete_highlight_endpoint(highlight_id: str, db: Session = Depends(get_db)):
     return {"message": "Highlight deleted successfully"}
 
 
-# --- Ask Fred AI Chat Grounded in Transcript ---
+# --- Ask Fred AI Chat Grounded in Transcript (Enhanced) ---
 
 @app.post("/api/meetings/{meeting_id}/chat", response_model=schemas.ChatMessageResponse, tags=["AI Chat"])
 def ask_fred_chat(meeting_id: str, chat_req: schemas.AskFredRequest, db: Session = Depends(get_db)):
@@ -229,44 +230,124 @@ def ask_fred_chat(meeting_id: str, chat_req: schemas.AskFredRequest, db: Session
         raise HTTPException(status_code=404, detail="Meeting not found")
 
     user_q = chat_req.question.strip()
-    # Save user message
     crud.add_chat_message(db, meeting_id, schemas.ChatMessageCreate(role="user", content=user_q))
 
-    # Transcript context analysis
-    transcript_text = "\n".join([f"[{s.speaker_name}]: {s.text}" for s in meeting.transcript_segments])
-    action_items_text = ", ".join([f"{a.task} ({a.assignee or 'Unassigned'})" for a in meeting.action_items])
-
-    # Smart response generation grounded in transcript
     q_lower = user_q.lower()
     answer = ""
 
-    # Check for speaker-specific questions
-    matching_speaker_segments = []
-    for s in meeting.transcript_segments:
-        if s.speaker_name.lower() in q_lower or any(word in s.text.lower() for word in q_lower.split() if len(word) > 4):
-            matching_speaker_segments.append(s)
+    # Parse bullet points if present
+    bullets_list = []
+    if meeting.bullet_points:
+        try:
+            b_data = json.loads(meeting.bullet_points)
+            if isinstance(b_data, list):
+                bullets_list = b_data
+        except Exception:
+            bullets_list = [l.strip("- ") for l in meeting.bullet_points.splitlines() if l.strip()]
 
-    if "action" in q_lower or "task" in q_lower or "todo" in q_lower:
+    # Case 1: Deadlines, Dates & Timeline Questions
+    if any(k in q_lower for k in ["deadline", "due date", "due", "when is", "timeline", "schedule"]):
         if meeting.action_items:
-            items_str = "\n".join([f"• {a.task} (Assignee: {a.assignee or 'Team'}, Due: {a.due_date or 'TBD'})" for a in meeting.action_items])
-            answer = f"Here are the action items captured from the meeting:\n{items_str}"
+            deadlines = [f"• **{a.task}**: Due **{a.due_date or 'TBD'}** (Assigned to: {a.assignee or 'Team'})" for a in meeting.action_items if a.due_date]
+            if deadlines:
+                answer = "Here are the key deadlines and commitments tracked for this meeting:\n\n" + "\n".join(deadlines)
+            else:
+                answer = f"The action items for '{meeting.title}' do not have explicit calendar deadlines, but the following tasks are pending:\n\n" + "\n".join([f"• {a.task} ({a.assignee or 'Unassigned'})" for a in meeting.action_items])
         else:
-            answer = "No outstanding action items were recorded for this meeting."
-    elif "who" in q_lower or "participant" in q_lower or "attend" in q_lower:
-        plist = ", ".join([f"{p.name} ({p.talk_time_percentage}% talk time)" for p in meeting.participants])
-        answer = f"The meeting was attended by: {plist}."
-    elif "summary" in q_lower or "overview" in q_lower or "about" in q_lower:
-        answer = meeting.summary_overview or "This meeting focused on team coordination, roadmap alignment, and technical deliverables."
-    elif matching_speaker_segments:
-        top_matches = matching_speaker_segments[:3]
-        snippets = " ".join([f"\"{m.speaker_name} noted: '{m.text}'\"" for m in top_matches])
-        answer = f"Based on the transcript: {snippets}"
+            answer = f"No formal deadlines were set during this discussion. The team agreed on general deliverables outlined in the meeting summary."
+
+    # Case 2: Technical Decisions & Architecture
+    elif any(k in q_lower for k in ["technical", "decision", "architecture", "stack", "tech", "infrastructure", "system", "code"]):
+        # Check if engineering topics or specific technical transcript lines exist
+        tech_keywords = ["queue", "database", "sqlite", "indexing", "fts", "api", "latency", "frontend", "backend", "next.js", "soc2", "compliance", "diarization", "crm", "salesforce", "hubspot", "refactor", "worker"]
+        relevant_tech = [s for s in meeting.transcript_segments if any(tk in s.text.lower() for tk in tech_keywords)]
+        
+        tech_takeaways = [b for b in bullets_list if any(tk in b.lower() for tk in ["architect", "technical", "database", "api", "queue", "system", "index", "frontend", "backend", "soc2", "crm"])]
+
+        if tech_takeaways:
+            bullets_str = "\n".join([f"• {t}" for t in tech_takeaways])
+            answer = f"Key technical decisions and architectural points for '{meeting.title}':\n\n{bullets_str}"
+        elif relevant_tech:
+            quotes = "\n".join([f"• **{s.speaker_name}**: \"{s.text}\"" for s in relevant_tech[:3]])
+            answer = f"The following technical decisions were discussed:\n\n{quotes}"
+        else:
+            answer = f"During '{meeting.title}', the technical discussion centered on: {meeting.summary_overview}"
+
+    # Case 3: Summary / Overview / Recap
+    elif any(k in q_lower for k in ["summarize", "summary", "recap", "overview", "what happened", "brief", "key takeaway"]):
+        overview = meeting.summary_overview or "The meeting covered project status and key milestones."
+        if bullets_list:
+            bullets_str = "\n".join([f"• {b}" for b in bullets_list])
+            answer = f"**Executive Summary:**\n{overview}\n\n**Key Takeaways:**\n{bullets_str}"
+        else:
+            answer = f"**Meeting Overview:**\n{overview}"
+
+    # Case 4: Action Items / Tasks / Next Steps
+    elif any(k in q_lower for k in ["action item", "action", "task", "todo", "next step", "to do", "assigned"]):
+        if meeting.action_items:
+            items_str = "\n".join([
+                f"• [{'x' if a.completed else ' '}] **{a.task}** — Assignee: *{a.assignee or 'Unassigned'}* (Due: {a.due_date or 'TBD'})"
+                for a in meeting.action_items
+            ])
+            answer = f"Here is the status of all action items for this meeting:\n\n{items_str}"
+        else:
+            answer = "There are no pending action items recorded for this meeting."
+
+    # Case 5: Participants / Who Spoke / Talk Time
+    elif any(k in q_lower for k in ["who spoke", "participant", "attend", "who was", "speaker", "talk time"]):
+        if meeting.participants:
+            sorted_p = sorted(meeting.participants, key=lambda x: x.talk_time_percentage or 0, reverse=True)
+            plist = "\n".join([f"• **{p.name}**: {p.talk_time_percentage or 0}% talk time ({p.email or 'N/A'})" for p in sorted_p])
+            top_speaker = sorted_p[0]
+            answer = f"The meeting participants and their talk-time breakdown:\n\n{plist}\n\n**{top_speaker.name}** had the highest share of speaking time ({top_speaker.talk_time_percentage}%)."
+        else:
+            answer = f"Participants for '{meeting.title}' were not explicitly recorded."
+
+    # Case 6: Specific Speaker Questions (e.g. "What did David say?", "Liam's points", "What did Sarah mention?")
     else:
-        answer = (
-            f"According to the transcript of '{meeting.title}', the team reviewed core progress, "
-            f"discussed architectural milestones, and assigned follow-ups. "
-            f"Key discussion focused on: {meeting.summary_overview[:150]}..."
-        )
+        matched_speaker = None
+        for p in meeting.participants:
+            first_name = p.name.split()[0].lower()
+            if first_name in q_lower or p.name.lower() in q_lower:
+                matched_speaker = p
+                break
+
+        if matched_speaker:
+            spk_segments = [s for s in meeting.transcript_segments if matched_speaker.name.lower() in s.speaker_name.lower()]
+            if spk_segments:
+                quotes = "\n".join([f"• [{int(s.start_time//60):02d}:{int(s.start_time%60):02d}] \"{s.text}\"" for s in spk_segments[:4]])
+                answer = f"Here is what **{matched_speaker.name}** contributed to the discussion ({matched_speaker.talk_time_percentage}% talk time):\n\n{quotes}"
+            else:
+                answer = f"**{matched_speaker.name}** attended the meeting but no specific statements were attributed to them."
+
+        # Case 7: Semantic Keyword Search in Transcripts
+        else:
+            stop_words = {"what", "is", "the", "are", "about", "did", "they", "this", "that", "how", "why", "can", "you", "tell", "me", "there"}
+            query_words = [w for w in re.findall(r'\b[a-z]{3,}\b', q_lower) if w not in stop_words]
+            
+            scored_segments = []
+            for s in meeting.transcript_segments:
+                s_lower = s.text.lower()
+                matches = sum(1 for w in query_words if w in s_lower)
+                if matches > 0:
+                    scored_segments.append((matches, s))
+
+            scored_segments.sort(key=lambda x: x[0], reverse=True)
+
+            if scored_segments:
+                top_segments = [item[1] for item in scored_segments[:3]]
+                quotes = "\n".join([f"• **{s.speaker_name}** [{int(s.start_time//60):02d}:{int(s.start_time%60):02d}]: \"{s.text}\"" for s in top_segments])
+                answer = f"Relevant excerpts from the transcript matching your query:\n\n{quotes}"
+            else:
+                # Case 8: Intelligent Chapter-Aware Context Fallback
+                chap_titles = [f"• **{c.title}** ({int(c.timestamp//60):02d}:{int(c.timestamp%60):02d})" for c in meeting.topic_chapters]
+                chaps_str = "\n".join(chap_titles) if chap_titles else "General Agenda"
+                answer = (
+                    f"Regarding your query about '{user_q}', the discussion in '{meeting.title}' covers:\n\n"
+                    f"{meeting.summary_overview}\n\n"
+                    f"**Meeting Agenda Chapters:**\n{chaps_str}\n\n"
+                    f"You can also ask specific questions like: *\"What are the deadlines?\"*, *\"Who spoke the most?\"*, or *\"What did {meeting.participants[0].name.split()[0]} say?\"*."
+                )
 
     assistant_msg = crud.add_chat_message(db, meeting_id, schemas.ChatMessageCreate(role="assistant", content=answer))
     return schemas.ChatMessageResponse.model_validate(assistant_msg)
