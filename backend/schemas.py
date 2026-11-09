@@ -188,3 +188,4 @@ class GlobalSearchResult(BaseModel):
     snippet: str
     timestamp: Optional[float] = None
     speaker: Optional[str] = None
+

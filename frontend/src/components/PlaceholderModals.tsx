@@ -161,3 +161,4 @@ export const IntegrationsModal: React.FC<IntegrationsModalProps> = ({ isOpen, on
     </div>
   );
 };
+

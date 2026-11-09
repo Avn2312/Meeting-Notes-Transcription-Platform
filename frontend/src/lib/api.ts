@@ -136,3 +136,4 @@ export async function searchGlobal(query: string): Promise<GlobalSearchResult[]>
 export function getExportUrl(meetingId: string, format: 'markdown' | 'txt' | 'json'): string {
   return `${BASE_URL}/api/meetings/${meetingId}/export?format=${format}`;
 }
+

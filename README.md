@@ -277,3 +277,4 @@ This tests:
 1. **Audio File Handling**: Real speech-to-text audio processing is out of scope per assignment instructions. A sample 2-minute audio file is bundled and served statically by FastAPI (`/api/audio/sample.wav`), allowing the audio seekbar and transcript synchronization to be tested end-to-end.
 2. **Transcript Formats**: The ingestion engine accepts WebVTT, timestamp bracket notation (`[00:15] Speaker: Text`), colon notation (`Speaker [00:15]: Text`), raw lines, and JSON structures.
 3. **AI Post-Meeting Processing**: The backend features a transcript parsing and insight extraction engine that automatically generates executive summaries, key takeaways, chapter outlines, and actionable tasks. It also supports an interactive "Ask Fred" Q&A chat endpoint grounded in transcript content.
+

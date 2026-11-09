@@ -330,3 +330,4 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
     </div>
   );
 };
+

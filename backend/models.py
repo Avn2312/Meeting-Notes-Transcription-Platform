@@ -109,3 +109,4 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
     meeting = relationship("Meeting", back_populates="chat_messages")
+

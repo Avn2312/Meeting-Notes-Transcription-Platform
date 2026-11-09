@@ -68,3 +68,4 @@ def init_db(reset: bool = True):
 
 if __name__ == "__main__":
     init_db(reset=True)
+

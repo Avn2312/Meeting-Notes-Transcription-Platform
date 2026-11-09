@@ -455,3 +455,4 @@ def extract_ai_summary_and_tasks(title: str, segments: List[dict]) -> Tuple[str,
             })
 
     return summary, bullet_points, action_items, chapters
+
