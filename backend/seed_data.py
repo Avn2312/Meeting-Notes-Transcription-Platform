@@ -8,7 +8,7 @@ def get_seed_data():
         {
             "title": "Q4 Engineering Sprint Planning & Architecture Review",
             "date": now - timedelta(days=1, hours=2),
-            "duration_seconds": 120,
+            "duration_seconds": 92,
             "audio_url": "/api/audio/sample.wav",
             "summary_overview": "The engineering team reviewed Q4 architectural milestones, focusing on transitioning the transcript processing pipeline to an asynchronous event-driven queue. The team discussed database indexing optimizations for sub-second global search and confirmed the rollout timeline for the Next.js 14 frontend migration.",
             "bullet_points": json.dumps([
@@ -25,9 +25,9 @@ def get_seed_data():
             ],
             "topic_chapters": [
                 {"title": "Sprint Retrospective & Velocity", "timestamp": 0.0, "summary": "Reviewing last sprint's completion rate and throughput bottlenecks."},
-                {"title": "Pipeline Architecture Refactor", "timestamp": 35.0, "summary": "Transitioning to asynchronous workers for transcript chunking."},
-                {"title": "Database Indexing & SQLite Performance", "timestamp": 72.0, "summary": "Full-text indexing benchmark results and query latency."},
-                {"title": "Action Items & Timeline Alignment", "timestamp": 100.0, "summary": "Final assignment of tasks and deadline commitments."}
+                {"title": "Pipeline Architecture Refactor", "timestamp": 21.4, "summary": "Transitioning to asynchronous workers for transcript chunking."},
+                {"title": "Interactive Transcript & Audio Sync", "timestamp": 41.9, "summary": "Full-text indexing benchmark results and query latency."},
+                {"title": "Action Items & Timeline Alignment", "timestamp": 72.4, "summary": "Final assignment of tasks and deadline commitments."}
             ],
             "action_items": [
                 {"task": "Benchmark SQLite FTS5 query latency against 100k segments", "assignee": "David Miller", "due_date": "Nov 15", "completed": True},
@@ -35,15 +35,15 @@ def get_seed_data():
                 {"task": "Prepare Docker Compose manifest for backend and frontend deployment", "assignee": "Elena Rostova", "due_date": "Nov 20", "completed": False}
             ],
             "transcript_segments": [
-                {"speaker_name": "Sarah Connor", "start_time": 0.0, "end_time": 9.5, "text": "Good morning team. Let's kick off our Q4 sprint planning. Today our main agenda is the transcript pipeline architecture and search indexing.", "sequence_order": 0},
-                {"speaker_name": "David Miller", "start_time": 10.0, "end_time": 22.0, "text": "Thanks Sarah. From the backend side, our current challenge is latency when uploading large meeting audio files. We need an asynchronous job worker so the user UI stays responsive.", "sequence_order": 1},
-                {"speaker_name": "Elena Rostova", "start_time": 22.5, "end_time": 34.0, "text": "I agree. We can use a lightweight queue or background task pattern. The frontend can poll or receive a websocket update when processing finishes.", "sequence_order": 2},
-                {"speaker_name": "Sarah Connor", "start_time": 35.0, "end_time": 46.5, "text": "That makes total sense. Next, let's talk about the interactive transcript view. Users want to click on any sentence and immediately seek the media player to that point.", "sequence_order": 3},
-                {"speaker_name": "David Miller", "start_time": 47.0, "end_time": 60.0, "text": "Right, each segment has start_time and end_time timestamps. We can bind an onTimeUpdate listener on the audio element to highlight the current transcript block in real-time.", "sequence_order": 4},
-                {"speaker_name": "Elena Rostova", "start_time": 60.5, "end_time": 71.0, "text": "And when the user selects text in the transcript, we should let them create a soundbite snippet or highlight with custom notes. Fireflies does this exceptionally well.", "sequence_order": 5},
-                {"speaker_name": "Sarah Connor", "start_time": 72.0, "end_time": 84.0, "text": "Brilliant. Let's make sure the search bar highlights matching occurrences with a distinct yellow badge and auto-scrolls the active segment into view.", "sequence_order": 6},
-                {"speaker_name": "David Miller", "start_time": 84.5, "end_time": 99.0, "text": "I'll take ownership of the database schema and query indexes. We'll ensure cascade deletes for meetings and their child records.", "sequence_order": 7},
-                {"speaker_name": "Sarah Connor", "start_time": 100.0, "end_time": 120.0, "text": "Great! Let's wrap up. David has the database tasks, Elena has the API endpoints, and I'll finish the responsive Next.js layout. Thanks everyone!", "sequence_order": 8}
+                {"speaker_name": "Sarah Connor", "start_time": 0.0, "end_time": 8.4, "text": "Good morning team. Let's kick off our Q4 sprint planning. Today our main agenda is the transcript pipeline architecture and search indexing.", "sequence_order": 0},
+                {"speaker_name": "David Miller", "start_time": 9.2, "end_time": 20.6, "text": "Thanks Sarah. From the backend side, our current challenge is latency when uploading large meeting audio files. We need an asynchronous job worker so the user UI stays responsive.", "sequence_order": 1},
+                {"speaker_name": "Elena Rostova", "start_time": 21.4, "end_time": 30.0, "text": "I agree. We can use a lightweight queue or background task pattern. The frontend can poll or receive a websocket update when processing finishes.", "sequence_order": 2},
+                {"speaker_name": "Sarah Connor", "start_time": 30.8, "end_time": 41.1, "text": "That makes total sense. Next, let's talk about the interactive transcript view. Users want to click on any sentence and immediately seek the media player to that point.", "sequence_order": 3},
+                {"speaker_name": "David Miller", "start_time": 41.9, "end_time": 52.5, "text": "Right, each segment has start_time and end_time timestamps. We can bind an onTimeUpdate listener on the audio element to highlight the current transcript block in real-time.", "sequence_order": 4},
+                {"speaker_name": "Elena Rostova", "start_time": 53.3, "end_time": 62.8, "text": "And when the user selects text in the transcript, we should let them create a soundbite snippet or highlight with custom notes. Fireflies does this exceptionally well.", "sequence_order": 5},
+                {"speaker_name": "Sarah Connor", "start_time": 63.6, "end_time": 71.6, "text": "Brilliant. Let's make sure the search bar highlights matching occurrences with a distinct yellow badge and auto-scrolls the active segment into view.", "sequence_order": 6},
+                {"speaker_name": "David Miller", "start_time": 72.4, "end_time": 80.3, "text": "I'll take ownership of the database schema and query indexes. We'll ensure cascade deletes for meetings and their child records.", "sequence_order": 7},
+                {"speaker_name": "Sarah Connor", "start_time": 81.1, "end_time": 91.2, "text": "Great! Let's wrap up. David has the database tasks, Elena has the API endpoints, and I'll finish the responsive Next.js layout. Thanks everyone!", "sequence_order": 8}
             ]
         },
         {
