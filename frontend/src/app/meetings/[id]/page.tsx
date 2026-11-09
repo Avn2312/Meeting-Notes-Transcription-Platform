@@ -20,6 +20,8 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { InteractiveTranscript } from '@/components/InteractiveTranscript';
 import { SummaryPanel } from '@/components/SummaryPanel';
 import { ExportModal } from '@/components/ExportModal';
+import { ShareModal } from '@/components/PlaceholderModals';
+import { useToast } from '@/components/Toast';
 import {
   fetchMeeting,
   updateMeetingMetadata,
@@ -38,6 +40,7 @@ export default function MeetingDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const meetingId = params.id as string;
+  const { showToast } = useToast();
 
   const [meeting, setMeeting] = useState<MeetingDetail | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -53,7 +56,7 @@ export default function MeetingDetailPage() {
 
   // Modals & Feedback
   const [exportOpen, setExportOpen] = useState<boolean>(false);
-  const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const [shareOpen, setShareOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (!meetingId) return;
@@ -91,8 +94,9 @@ export default function MeetingDetailPage() {
       const updated = await updateMeetingMetadata(meeting.id, { title: editedTitle.trim() });
       setMeeting((prev) => (prev ? { ...prev, title: updated.title } : null));
       setIsEditingTitle(false);
+      showToast('Meeting renamed successfully', 'success');
     } catch {
-      alert('Failed to update title');
+      showToast('Failed to update title', 'error');
     }
   };
 
@@ -100,17 +104,10 @@ export default function MeetingDetailPage() {
     if (!confirm('Are you sure you want to delete this meeting?')) return;
     try {
       await deleteMeeting(meetingId);
+      showToast('Meeting deleted', 'success');
       router.push('/');
     } catch {
-      alert('Failed to delete meeting');
-    }
-  };
-
-  const handleCopyShareLink = () => {
-    if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(window.location.href);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
+      showToast('Failed to delete meeting', 'error');
     }
   };
 
@@ -132,8 +129,9 @@ export default function MeetingDetailPage() {
             }
           : null
       );
+      showToast(nextCompleted ? 'Task marked completed' : 'Task marked pending', 'success');
     } catch {
-      alert('Failed to update action item');
+      showToast('Failed to update action item', 'error');
     }
   };
 
@@ -148,8 +146,26 @@ export default function MeetingDetailPage() {
       setMeeting((prev) =>
         prev ? { ...prev, action_items: [...prev.action_items, created] } : null
       );
+      showToast('Action item added', 'success');
     } catch {
-      alert('Failed to add action item');
+      showToast('Failed to add action item', 'error');
+    }
+  };
+
+  const handleEditActionItem = async (id: string, task: string) => {
+    try {
+      const updated = await updateActionItem(id, { task });
+      setMeeting((prev) =>
+        prev
+          ? {
+              ...prev,
+              action_items: prev.action_items.map((a) => (a.id === updated.id ? updated : a))
+            }
+          : null
+      );
+      showToast('Task updated', 'success');
+    } catch {
+      showToast('Failed to update task', 'error');
     }
   };
 
@@ -159,8 +175,9 @@ export default function MeetingDetailPage() {
       setMeeting((prev) =>
         prev ? { ...prev, action_items: prev.action_items.filter((a) => a.id !== id) } : null
       );
+      showToast('Action item removed', 'info');
     } catch {
-      alert('Failed to delete action item');
+      showToast('Failed to delete action item', 'error');
     }
   };
 
@@ -177,8 +194,9 @@ export default function MeetingDetailPage() {
       setMeeting((prev) =>
         prev ? { ...prev, highlights: [...prev.highlights, created] } : null
       );
+      showToast('Soundbite note saved', 'success');
     } catch {
-      alert('Failed to save highlight');
+      showToast('Failed to save highlight', 'error');
     }
   };
 
@@ -188,8 +206,9 @@ export default function MeetingDetailPage() {
       setMeeting((prev) =>
         prev ? { ...prev, highlights: prev.highlights.filter((h) => h.id !== id) } : null
       );
+      showToast('Highlight deleted', 'info');
     } catch {
-      alert('Failed to delete highlight');
+      showToast('Failed to delete highlight', 'error');
     }
   };
 
@@ -222,7 +241,7 @@ export default function MeetingDetailPage() {
           : null
       );
     } catch {
-      alert('Failed to get answer from Fred');
+      showToast('Failed to get answer from Fred', 'error');
     }
   };
 
@@ -288,7 +307,7 @@ export default function MeetingDetailPage() {
               />
               <button
                 onClick={handleSaveTitle}
-                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
               >
                 <Check className="w-4 h-4" />
               </button>
@@ -300,7 +319,7 @@ export default function MeetingDetailPage() {
               </h2>
               <button
                 onClick={() => setIsEditingTitle(true)}
-                className="text-slate-400 hover:text-violet-600 p-1"
+                className="text-slate-400 hover:text-violet-600 p-1 cursor-pointer"
                 title="Rename Title"
               >
                 <Edit3 className="w-3.5 h-3.5" />
@@ -323,20 +342,11 @@ export default function MeetingDetailPage() {
         {/* Right Actions */}
         <div className="flex items-center gap-2">
           <button
-            onClick={handleCopyShareLink}
+            onClick={() => setShareOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors cursor-pointer"
           >
-            {copiedLink ? (
-              <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Link Copied</span>
-              </>
-            ) : (
-              <>
-                <Link2 className="w-3.5 h-3.5" />
-                <span>Share</span>
-              </>
-            )}
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Share</span>
           </button>
 
           <button
@@ -360,7 +370,7 @@ export default function MeetingDetailPage() {
       {/* Pinned Audio Player Bar */}
       <AudioPlayer
         audioUrl={meeting.audio_url}
-        duration={meeting.duration_seconds || 120}
+        duration={meeting.duration_seconds || 92}
         currentTime={currentTime}
         onTimeUpdate={(t) => setCurrentTime(t)}
         onSeek={handleSeek}
@@ -395,6 +405,7 @@ export default function MeetingDetailPage() {
             onSeek={handleSeek}
             onToggleActionItem={handleToggleActionItem}
             onAddActionItem={handleAddActionItem}
+            onEditActionItem={handleEditActionItem}
             onDeleteActionItem={handleDeleteActionItem}
             onSendChatMessage={handleSendChatMessage}
           />
@@ -408,7 +419,13 @@ export default function MeetingDetailPage() {
         meetingId={meeting.id}
         meetingTitle={meeting.title}
       />
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        meetingTitle={meeting.title}
+      />
     </div>
   );
 }
-

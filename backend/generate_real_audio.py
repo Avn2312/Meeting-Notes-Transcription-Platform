@@ -55,3 +55,4 @@ with wave.open(output_wav_path, 'wb') as outfile:
 with wave.open(output_wav_path, 'rb') as check:
     total_sec = check.getnframes() / check.getframerate()
     print(f"Successfully created real meeting speech audio: {output_wav_path} (Duration: {total_sec:.1f}s)")
+

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Download, Copy, Check, FileText, Code, FileCode, X } from 'lucide-react';
+import { Download, Copy, Check, FileText, Code, FileCode, Printer, X } from 'lucide-react';
 import { getExportUrl } from '@/lib/api';
+import { useToast } from '@/components/Toast';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   meetingTitle
 }) => {
   const [copied, setCopied] = useState<boolean>(false);
+  const { showToast } = useToast();
 
   if (!isOpen) return null;
 
@@ -27,10 +29,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       const text = await res.text();
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      showToast('Meeting notes copied to clipboard!', 'success');
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      alert('Could not copy to clipboard.');
+      showToast('Could not copy to clipboard', 'error');
     }
+  };
+
+  const handlePrintPdf = () => {
+    showToast('Opening PDF Print preview...', 'info');
+    setTimeout(() => {
+      window.print();
+    }, 300);
   };
 
   return (
@@ -41,7 +51,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             <Download className="w-4 h-4" />
             <span>Export Meeting Notes</span>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -52,10 +62,28 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         </p>
 
         <div className="mt-4 space-y-2.5">
+          {/* PDF Export */}
+          <button
+            onClick={handlePrintPdf}
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-violet-50 dark:hover:bg-violet-950/40 border border-slate-200 dark:border-slate-700/80 hover:border-violet-300 dark:hover:border-violet-700 transition-all group cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 flex items-center justify-center">
+                <Printer className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">PDF Document (.pdf)</p>
+                <p className="text-[11px] text-slate-400">Formatted meeting summary for printing or PDF save</p>
+              </div>
+            </div>
+            <Download className="w-4 h-4 text-slate-400 group-hover:text-violet-600" />
+          </button>
+
           {/* Markdown Download */}
           <a
             href={getExportUrl(meetingId, 'markdown')}
             download
+            onClick={() => showToast('Downloading Markdown export...', 'success')}
             className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-violet-50 dark:hover:bg-violet-950/40 border border-slate-200 dark:border-slate-700/80 hover:border-violet-300 dark:hover:border-violet-700 transition-all group"
           >
             <div className="flex items-center gap-3">
@@ -74,6 +102,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <a
             href={getExportUrl(meetingId, 'txt')}
             download
+            onClick={() => showToast('Downloading Plain Text export...', 'success')}
             className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-violet-50 dark:hover:bg-violet-950/40 border border-slate-200 dark:border-slate-700/80 hover:border-violet-300 dark:hover:border-violet-700 transition-all group"
           >
             <div className="flex items-center gap-3">
@@ -92,6 +121,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <a
             href={getExportUrl(meetingId, 'json')}
             download
+            onClick={() => showToast('Downloading JSON payload...', 'success')}
             className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-violet-50 dark:hover:bg-violet-950/40 border border-slate-200 dark:border-slate-700/80 hover:border-violet-300 dark:hover:border-violet-700 transition-all group"
           >
             <div className="flex items-center gap-3">
@@ -111,7 +141,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <button
             onClick={handleCopyClipboard}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors cursor-pointer"
           >
             {copied ? (
               <>
@@ -130,4 +160,3 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     </div>
   );
 };
-

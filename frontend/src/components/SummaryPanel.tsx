@@ -15,6 +15,8 @@ import {
   Send,
   Plus,
   Trash2,
+  Edit2,
+  Check,
   Bot,
   User,
   ListTodo,
@@ -34,6 +36,7 @@ interface SummaryPanelProps {
   onSeek: (time: number) => void;
   onToggleActionItem: (item: ActionItem) => void;
   onAddActionItem: (task: string, assignee?: string, dueDate?: string) => void;
+  onEditActionItem?: (id: string, task: string) => void;
   onDeleteActionItem: (id: string) => void;
   onSendChatMessage: (question: string) => Promise<void>;
 }
@@ -49,12 +52,15 @@ export const SummaryPanel: React.FC<SummaryPanelProps> = ({
   onSeek,
   onToggleActionItem,
   onAddActionItem,
+  onEditActionItem,
   onDeleteActionItem,
   onSendChatMessage
 }) => {
   const [activeTab, setActiveTab] = useState<'summary' | 'actions' | 'chapters' | 'chat'>('summary');
   const [newTaskInput, setNewTaskInput] = useState<string>('');
   const [newAssigneeInput, setNewAssigneeInput] = useState<string>('');
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingItemText, setEditingItemText] = useState<string>('');
   const [chatInput, setChatInput] = useState<string>('');
   const [isSendingChat, setIsSendingChat] = useState<boolean>(false);
 
@@ -294,15 +300,48 @@ export const SummaryPanel: React.FC<SummaryPanelProps> = ({
                     </button>
 
                     <div className="flex-1 min-w-0">
-                      <p
-                        className={`text-xs leading-normal font-medium ${
-                          item.completed
-                            ? 'line-through text-slate-400 dark:text-slate-500'
-                            : 'text-slate-800 dark:text-slate-200'
-                        }`}
-                      >
-                        {item.task}
-                      </p>
+                      {editingItemId === item.id ? (
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <input
+                            type="text"
+                            value={editingItemText}
+                            onChange={(e) => setEditingItemText(e.target.value)}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                if (editingItemText.trim() && onEditActionItem) {
+                                  onEditActionItem(item.id, editingItemText.trim());
+                                }
+                                setEditingItemId(null);
+                              } else if (e.key === 'Escape') {
+                                setEditingItemId(null);
+                              }
+                            }}
+                            className="w-full px-2 py-1 text-xs bg-slate-100 dark:bg-slate-700 rounded-lg border border-violet-500 text-slate-800 dark:text-slate-200 focus:outline-hidden"
+                          />
+                          <button
+                            onClick={() => {
+                              if (editingItemText.trim() && onEditActionItem) {
+                                onEditActionItem(item.id, editingItemText.trim());
+                              }
+                              setEditingItemId(null);
+                            }}
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <p
+                          className={`text-xs leading-normal font-medium ${
+                            item.completed
+                              ? 'line-through text-slate-400 dark:text-slate-500'
+                              : 'text-slate-800 dark:text-slate-200'
+                          }`}
+                        >
+                          {item.task}
+                        </p>
+                      )}
 
                       <div className="flex items-center gap-2 mt-1.5 text-[11px] text-slate-400">
                         {item.assignee && (
@@ -319,13 +358,26 @@ export const SummaryPanel: React.FC<SummaryPanelProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => onDeleteActionItem(item.id)}
-                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-500 transition-opacity p-1 cursor-pointer"
-                      title="Delete action item"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setEditingItemId(item.id);
+                          setEditingItemText(item.task);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-violet-600 transition-opacity p-1 cursor-pointer"
+                        title="Edit task"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+
+                      <button
+                        onClick={() => onDeleteActionItem(item.id)}
+                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-500 transition-opacity p-1 cursor-pointer"
+                        title="Delete action item"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

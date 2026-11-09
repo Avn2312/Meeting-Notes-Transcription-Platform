@@ -4,7 +4,6 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Mic,
   Calendar,
   Settings,
   Sparkles,
@@ -21,6 +20,7 @@ interface SidebarProps {
   onOpenUpload?: () => void;
   onOpenLiveBot?: () => void;
   onOpenIntegrations?: () => void;
+  onOpenSettings?: () => void;
   darkMode?: boolean;
   onToggleDarkMode?: () => void;
 }
@@ -29,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenUpload,
   onOpenLiveBot,
   onOpenIntegrations,
+  onOpenSettings,
   darkMode,
   onToggleDarkMode
 }) => {
@@ -39,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Soundbites', href: '/#soundbites', icon: Bookmark, badge: 'New' },
     { name: 'Analytics', href: '/#analytics', icon: BarChart3 },
     { name: 'Integrations', onClick: onOpenIntegrations, icon: Share2 },
-    { name: 'Settings', href: '/#settings', icon: Settings },
+    { name: 'Settings', onClick: onOpenSettings, icon: Settings },
   ];
 
   return (
@@ -86,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href || '---');
+          const isActive = item.href === '/' ? pathname === '/' : (item.href ? pathname.startsWith(item.href) : false);
 
           if (item.onClick) {
             return (
@@ -148,4 +149,3 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
-

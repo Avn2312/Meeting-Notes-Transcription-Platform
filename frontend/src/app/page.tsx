@@ -10,7 +10,6 @@ import {
   Users,
   CheckCircle2,
   ListTodo,
-  MoreVertical,
   Trash2,
   Edit2,
   Download,
@@ -19,24 +18,27 @@ import {
   ArrowUpDown,
   Filter,
   Sparkles,
-  Command,
-  Radio,
-  Share2
+  Tag,
+  X
 } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { UploadModal } from '@/components/UploadModal';
 import { ExportModal } from '@/components/ExportModal';
 import { GlobalSearchModal } from '@/components/GlobalSearchModal';
-import { LiveBotModal, IntegrationsModal } from '@/components/PlaceholderModals';
+import { LiveBotModal, IntegrationsModal, SettingsModal } from '@/components/PlaceholderModals';
+import { useToast } from '@/components/Toast';
 import { fetchMeetings, deleteMeeting, updateMeetingMetadata } from '@/lib/api';
-import { MeetingListItem, MeetingDetail } from '@/types/meeting';
+import { MeetingListItem } from '@/types/meeting';
 
 export default function MeetingsDashboard() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [speakerFilter, setSpeakerFilter] = useState<string>('');
+  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<string>('newest');
 
   // Modals
@@ -44,9 +46,10 @@ export default function MeetingsDashboard() {
   const [globalSearchOpen, setGlobalSearchOpen] = useState<boolean>(false);
   const [liveBotOpen, setLiveBotOpen] = useState<boolean>(false);
   const [integrationsOpen, setIntegrationsOpen] = useState<boolean>(false);
+  const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
   const [exportMeetingTarget, setExportMeetingTarget] = useState<MeetingListItem | null>(null);
 
-  // Edit title inline / modal
+  // Edit metadata modal
   const [editingMeeting, setEditingMeeting] = useState<MeetingListItem | null>(null);
   const [editTitleInput, setEditTitleInput] = useState<string>('');
 
@@ -54,7 +57,6 @@ export default function MeetingsDashboard() {
   const [darkMode, setDarkMode] = useState<boolean>(false);
 
   useEffect(() => {
-    // Check saved theme or system preference
     if (typeof window !== 'undefined') {
       const isDark = localStorage.getItem('theme') === 'dark';
       setDarkMode(isDark);
@@ -73,9 +75,11 @@ export default function MeetingsDashboard() {
       if (nextDark) {
         document.documentElement.classList.add('dark');
         localStorage.setItem('theme', 'dark');
+        showToast('Switched to Dark Mode', 'info');
       } else {
         document.documentElement.classList.remove('dark');
         localStorage.setItem('theme', 'light');
+        showToast('Switched to Light Mode', 'info');
       }
     }
   };
@@ -118,8 +122,9 @@ export default function MeetingsDashboard() {
     try {
       await deleteMeeting(id);
       setMeetings((prev) => prev.filter((m) => m.id !== id));
+      showToast('Meeting deleted successfully', 'success');
     } catch {
-      alert('Failed to delete meeting.');
+      showToast('Failed to delete meeting', 'error');
     }
   };
 
@@ -140,8 +145,9 @@ export default function MeetingsDashboard() {
         prev.map((m) => (m.id === updated.id ? { ...m, title: updated.title } : m))
       );
       setEditingMeeting(null);
+      showToast('Meeting title updated', 'success');
     } catch {
-      alert('Failed to update title.');
+      showToast('Failed to update title', 'error');
     }
   };
 
@@ -160,6 +166,39 @@ export default function MeetingsDashboard() {
     });
   };
 
+  // Derive topic tags for a meeting based on title
+  const getMeetingTags = (title: string): string[] => {
+    const tags: string[] = [];
+    const t = title.toLowerCase();
+    if (t.includes('engineering') || t.includes('sprint') || t.includes('architecture')) tags.push('Engineering');
+    if (t.includes('design') || t.includes('product') || t.includes('ui')) tags.push('Design');
+    if (t.includes('customer') || t.includes('sales') || t.includes('enterprise')) tags.push('Sales');
+    if (t.includes('1-on-1') || t.includes('leadership') || t.includes('mentorship')) tags.push('Management');
+    if (tags.length === 0) tags.push('General');
+    return tags;
+  };
+
+  // Filter meetings by Date and Topic Tags on client
+  const filteredMeetings = useMemo(() => {
+    const now = new Date().getTime();
+    return meetings.filter((m) => {
+      // Date filter
+      if (dateFilter !== 'all') {
+        const mTime = new Date(m.date).getTime();
+        const diffDays = (now - mTime) / (1000 * 3600 * 24);
+        if (dateFilter === 'today' && diffDays > 1) return false;
+        if (dateFilter === '7days' && diffDays > 7) return false;
+        if (dateFilter === '30days' && diffDays > 30) return false;
+      }
+      // Tag filter
+      if (tagFilter) {
+        const tags = getMeetingTags(m.title);
+        if (!tags.includes(tagFilter)) return false;
+      }
+      return true;
+    });
+  }, [meetings, dateFilter, tagFilter]);
+
   // Metrics
   const totalDuration = useMemo(() => {
     return meetings.reduce((acc, m) => acc + m.duration_seconds, 0);
@@ -176,6 +215,7 @@ export default function MeetingsDashboard() {
         onOpenUpload={() => setUploadOpen(true)}
         onOpenLiveBot={() => setLiveBotOpen(true)}
         onOpenIntegrations={() => setIntegrationsOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
         darkMode={darkMode}
         onToggleDarkMode={toggleDarkMode}
       />
@@ -188,7 +228,7 @@ export default function MeetingsDashboard() {
             <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <span>My Meetings</span>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300">
-                {meetings.length} Total
+                {filteredMeetings.length} Showing
               </span>
             </h1>
             <p className="text-xs text-slate-500">
@@ -261,39 +301,54 @@ export default function MeetingsDashboard() {
             </div>
           </div>
 
-          {/* Search, Filter & Sort Controls */}
+          {/* Search, Filter, Date & Sort Controls */}
           <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
             {/* Filter by title or overview */}
-            <div className="relative flex-1 min-w-[240px]">
+            <div className="relative flex-1 min-w-[220px]">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search meetings by title or summary..."
+                placeholder="Search by title or summary..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
               />
             </div>
 
+            {/* Filter by Date Range */}
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="px-2.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+              >
+                <option value="all">All Dates</option>
+                <option value="today">Past 24 Hours</option>
+                <option value="7days">Past 7 Days</option>
+                <option value="30days">Past 30 Days</option>
+              </select>
+            </div>
+
             {/* Filter by Speaker */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <Filter className="w-3.5 h-3.5 text-slate-400" />
               <input
                 type="text"
                 placeholder="Filter by participant..."
                 value={speakerFilter}
                 onChange={(e) => setSpeakerFilter(e.target.value)}
-                className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 w-44"
+                className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500 w-36 sm:w-44"
               />
             </div>
 
             {/* Sort Dropdown */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                className="px-2.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
               >
                 <option value="newest">Most Recent</option>
                 <option value="oldest">Oldest First</option>
@@ -303,130 +358,175 @@ export default function MeetingsDashboard() {
             </div>
           </div>
 
+          {/* Topic Tags Filter Bar */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-400 flex items-center gap-1 mr-1">
+              <Tag className="w-3 h-3" />
+              <span>Topics:</span>
+            </span>
+            {['Engineering', 'Design', 'Sales', 'Management'].map((tag) => {
+              const active = tagFilter === tag;
+              return (
+                <button
+                  key={tag}
+                  onClick={() => setTagFilter(active ? null : tag)}
+                  className={`text-xs px-3 py-1 rounded-full font-semibold transition-all cursor-pointer ${
+                    active
+                      ? 'bg-violet-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-violet-400'
+                  }`}
+                >
+                  #{tag}
+                </button>
+              );
+            })}
+            {tagFilter && (
+              <button
+                onClick={() => setTagFilter(null)}
+                className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center gap-1 cursor-pointer ml-1"
+              >
+                <X className="w-3 h-3" />
+                <span>Clear filter</span>
+              </button>
+            )}
+          </div>
+
           {/* Meeting Cards List */}
           {isLoading ? (
             <div className="py-20 text-center">
               <Sparkles className="w-8 h-8 text-violet-600 animate-spin mx-auto mb-3" />
               <p className="text-xs text-slate-500">Loading meetings repository...</p>
             </div>
-          ) : meetings.length === 0 ? (
+          ) : filteredMeetings.length === 0 ? (
             <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 shadow-xs">
               <Calendar className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
                 No meetings found
               </h3>
               <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                No meetings match your current search query. Create a new meeting by uploading or pasting a transcript.
+                No meetings match your current filters. Clear filters or create a new meeting.
               </p>
               <button
-                onClick={() => setUploadOpen(true)}
+                onClick={() => {
+                  setSearchQuery('');
+                  setSpeakerFilter('');
+                  setDateFilter('all');
+                  setTagFilter(null);
+                }}
                 className="mt-4 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
-                <span>Upload Sample Meeting</span>
+                <span>Reset Filters</span>
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {meetings.map((meeting) => (
-                <div
-                  key={meeting.id}
-                  onClick={() => router.push(`/meetings/${meeting.id}`)}
-                  className="group p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-violet-400 dark:hover:border-violet-600 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
-                >
-                  {/* Left Column: Meeting Info */}
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors truncate">
-                        {meeting.title}
-                      </h3>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-100 dark:border-violet-900 shrink-0">
-                        {formatDuration(meeting.duration_seconds)}
-                      </span>
+              {filteredMeetings.map((meeting) => {
+                const tags = getMeetingTags(meeting.title);
+                return (
+                  <div
+                    key={meeting.id}
+                    onClick={() => router.push(`/meetings/${meeting.id}`)}
+                    className="group p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-violet-400 dark:hover:border-violet-600 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  >
+                    {/* Left Column: Meeting Info */}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors truncate">
+                          {meeting.title}
+                        </h3>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-100 dark:border-violet-900 shrink-0">
+                          {formatDuration(meeting.duration_seconds)}
+                        </span>
+                        {tags.map((t) => (
+                          <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Metadata chips */}
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{formatDate(meeting.date)}</span>
+                        </span>
+
+                        {meeting.action_items_count > 0 && (
+                          <span className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>
+                              {meeting.action_items_count - meeting.pending_action_items_count}/
+                              {meeting.action_items_count} tasks
+                            </span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Summary snippet preview */}
+                      {meeting.summary_overview && (
+                        <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-1 leading-relaxed">
+                          {meeting.summary_overview}
+                        </p>
+                      )}
                     </div>
 
-                    {/* Metadata chips */}
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{formatDate(meeting.date)}</span>
-                      </span>
-
-                      {meeting.action_items_count > 0 && (
-                        <span className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>
-                            {meeting.action_items_count - meeting.pending_action_items_count}/
-                            {meeting.action_items_count} tasks
-                          </span>
+                    {/* Middle Column: Participants Avatar Stack */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex -space-x-2 overflow-hidden">
+                        {meeting.participants.slice(0, 4).map((p, idx) => (
+                          <div
+                            key={p.id || idx}
+                            title={`${p.name} (${p.talk_time_percentage}% talk time)`}
+                            className="w-7 h-7 rounded-full text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-slate-900 shadow-xs"
+                            style={{ backgroundColor: p.avatar_color || '#6366F1' }}
+                          >
+                            {p.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        ))}
+                      </div>
+                      {meeting.participants.length > 4 && (
+                        <span className="text-[10px] font-bold text-slate-400">
+                          +{meeting.participants.length - 4}
                         </span>
                       )}
                     </div>
 
-                    {/* Summary snippet preview */}
-                    {meeting.summary_overview && (
-                      <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-1 leading-relaxed">
-                        {meeting.summary_overview}
-                      </p>
-                    )}
-                  </div>
+                    {/* Right Column: Quick Action Buttons */}
+                    <div className="flex items-center gap-2 shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExportMeetingTarget(meeting);
+                        }}
+                        title="Export Meeting Notes"
+                        className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
 
-                  {/* Middle Column: Participants Avatar Stack */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="flex -space-x-2 overflow-hidden">
-                      {meeting.participants.slice(0, 4).map((p, idx) => (
-                        <div
-                          key={p.id || idx}
-                          title={`${p.name} (${p.talk_time_percentage}% talk time)`}
-                          className="w-7 h-7 rounded-full text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-slate-900 shadow-xs"
-                          style={{ backgroundColor: p.avatar_color || '#6366F1' }}
-                        >
-                          {p.name.slice(0, 2).toUpperCase()}
-                        </div>
-                      ))}
-                    </div>
-                    {meeting.participants.length > 4 && (
-                      <span className="text-[10px] font-bold text-slate-400">
-                        +{meeting.participants.length - 4}
-                      </span>
-                    )}
-                  </div>
+                      <button
+                        onClick={(e) => handleOpenEdit(meeting, e)}
+                        title="Edit Title"
+                        className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
 
-                  {/* Right Column: Quick Action Buttons */}
-                  <div className="flex items-center gap-2 shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 dark:border-slate-800">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExportMeetingTarget(meeting);
-                      }}
-                      title="Export Meeting Notes"
-                      className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
+                      <button
+                        onClick={(e) => handleDeleteMeeting(meeting.id, e)}
+                        title="Delete Meeting"
+                        className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
 
-                    <button
-                      onClick={(e) => handleOpenEdit(meeting, e)}
-                      title="Edit Title"
-                      className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      onClick={(e) => handleDeleteMeeting(meeting.id, e)}
-                      title="Delete Meeting"
-                      className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-
-                    <div className="w-8 h-8 rounded-xl bg-violet-600 group-hover:bg-violet-700 text-white flex items-center justify-center shadow-xs transition-colors ml-1">
-                      <Play className="w-3.5 h-3.5 ml-0.5 fill-current" />
+                      <div className="w-8 h-8 rounded-xl bg-violet-600 group-hover:bg-violet-700 text-white flex items-center justify-center shadow-xs transition-colors ml-1">
+                        <Play className="w-3.5 h-3.5 ml-0.5 fill-current" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -444,19 +544,19 @@ export default function MeetingsDashboard() {
                 type="text"
                 value={editTitleInput}
                 onChange={(e) => setEditTitleInput(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
               />
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setEditingMeeting(null)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-500"
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-500 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-violet-600 text-white"
+                  className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-violet-600 text-white cursor-pointer"
                 >
                   Save
                 </button>
@@ -471,6 +571,7 @@ export default function MeetingsDashboard() {
         isOpen={uploadOpen}
         onClose={() => setUploadOpen(false)}
         onSuccess={(created) => {
+          showToast(`Meeting "${created.title}" created!`, 'success');
           setMeetings((prev) => [
             {
               id: created.id,
@@ -519,6 +620,12 @@ export default function MeetingsDashboard() {
       <IntegrationsModal
         isOpen={integrationsOpen}
         onClose={() => setIntegrationsOpen(false)}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
       />
     </div>
   );

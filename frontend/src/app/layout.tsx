@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { ToastProvider } from '@/components/Toast';
 
 export const metadata: Metadata = {
   title: 'Fireflies.ai Clone — AI Meeting Notes & Transcription',
@@ -17,7 +18,7 @@ export default function RootLayout({
         className="min-h-full flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
         suppressHydrationWarning
       >
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );
