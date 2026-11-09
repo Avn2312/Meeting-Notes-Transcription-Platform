@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import {
   Play,
   Pause,
@@ -37,6 +37,24 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const [volume, setVolume] = useState<number>(1);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const progressBarRef = useRef<HTMLDivElement | null>(null);
+
+  // Compute resolved audio source URL
+  const audioSrc = useMemo(() => {
+    if (!audioUrl) return '/api/audio/sample.wav';
+    if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) return audioUrl;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
+    return `${apiBase}${audioUrl}`;
+  }, [audioUrl]);
+
+  // Reload audio element whenever source changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.load();
+      if (isPlaying) {
+        audioRef.current.play().catch(() => {});
+      }
+    }
+  }, [audioSrc]);
 
   // Sync isPlaying with HTML5 audio
   useEffect(() => {
@@ -118,7 +136,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       {/* Hidden audio element */}
       <audio
         ref={audioRef}
-        src={audioUrl || '/api/audio/sample.wav'}
+        src={audioSrc}
         onTimeUpdate={handleNativeTimeUpdate}
         onEnded={() => onPlayPauseToggle(false)}
         preload="metadata"

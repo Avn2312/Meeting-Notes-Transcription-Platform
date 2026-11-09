@@ -10,7 +10,11 @@ import {
   Bookmark,
   Filter,
   Check,
-  X
+  X,
+  Volume2,
+  VolumeX,
+  Sparkles,
+  Play
 } from 'lucide-react';
 
 interface InteractiveTranscriptProps {
@@ -37,8 +41,11 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
   const [activeHighlightSegmentId, setActiveHighlightSegmentId] = useState<string>('');
   const [highlightNoteInput, setHighlightNoteInput] = useState<string>('');
   const [highlightColor, setHighlightColor] = useState<string>('purple');
+  const [speakingSegmentId, setSpeakingSegmentId] = useState<string | null>(null);
+  const [autoVoiceReader, setAutoVoiceReader] = useState<boolean>(false);
 
   const segmentRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const lastSpokenSegmentId = useRef<string | null>(null);
 
   // Unique speakers
   const speakers = useMemo(() => {
@@ -76,6 +83,65 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
       return matchesSpeaker && matchesSearch;
     });
   }, [segments, selectedSpeaker, searchTerm]);
+
+  // Stop speaking on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  // Web Speech API Voice Assistant
+  const speakSegment = (segment: TranscriptSegment) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    if (speakingSegmentId === segment.id) {
+      window.speechSynthesis.cancel();
+      setSpeakingSegmentId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(segment.text);
+    utterance.rate = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const enVoice = voices.find(
+      (v) =>
+        v.lang.startsWith('en') &&
+        (v.name.includes('Natural') ||
+          v.name.includes('Samantha') ||
+          v.name.includes('Google') ||
+          v.name.includes('Daniel') ||
+          v.name.includes('Alex'))
+    ) || voices[0];
+    if (enVoice) utterance.voice = enVoice;
+
+    utterance.onstart = () => {
+      setSpeakingSegmentId(segment.id);
+    };
+    utterance.onend = () => {
+      setSpeakingSegmentId(null);
+    };
+    utterance.onerror = () => {
+      setSpeakingSegmentId(null);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Auto Voice Reader for active segment when toggle is ON
+  useEffect(() => {
+    if (!autoVoiceReader || !activeSegmentId) return;
+    if (lastSpokenSegmentId.current === activeSegmentId) return;
+    const seg = segments.find((s) => s.id === activeSegmentId);
+    if (seg) {
+      lastSpokenSegmentId.current = activeSegmentId;
+      speakSegment(seg);
+    }
+  }, [autoVoiceReader, activeSegmentId, segments]);
 
   // Helper to format timestamp
   const formatTime = (secs: number) => {
@@ -145,13 +211,33 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
           )}
         </div>
 
-        {/* Speaker Filter Dropdown */}
+        {/* Speaker Filter Dropdown & Voice Assistant Toggle */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const nextVal = !autoVoiceReader;
+              setAutoVoiceReader(nextVal);
+              if (!nextVal && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                setSpeakingSegmentId(null);
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+              autoVoiceReader
+                ? 'bg-violet-600 border-violet-600 text-white shadow-xs'
+                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-violet-400'
+            }`}
+            title="Auto-read each segment aloud with Voice Assistant"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${autoVoiceReader ? 'animate-spin text-amber-300' : 'text-violet-500'}`} />
+            <span>Voice Reader: {autoVoiceReader ? 'ON' : 'OFF'}</span>
+          </button>
+
           <Filter className="w-3.5 h-3.5 text-slate-400" />
           <select
             value={selectedSpeaker}
             onChange={(e) => setSelectedSpeaker(e.target.value)}
-            className="px-2.5 py-2 rounded-xl text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
+            className="px-2.5 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-2 focus:ring-violet-500 cursor-pointer"
           >
             <option value="all">All Speakers ({speakers.length})</option>
             {speakers.map((spk) => (
@@ -209,9 +295,35 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
                 {/* Speaker Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="font-semibold text-xs text-slate-800 dark:text-slate-200">
-                      {segment.speaker_name}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-xs text-slate-800 dark:text-slate-200">
+                        {segment.speaker_name}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          speakSegment(segment);
+                        }}
+                        title={speakingSegmentId === segment.id ? 'Stop Voice Assistant' : 'Voice Assistant: Read aloud'}
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                          speakingSegmentId === segment.id
+                            ? 'bg-violet-600 text-white animate-pulse shadow-xs ring-2 ring-violet-400'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/60'
+                        }`}
+                      >
+                        {speakingSegmentId === segment.id ? (
+                          <>
+                            <VolumeX className="w-3 h-3" />
+                            <span>Reading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 className="w-3 h-3 text-violet-500" />
+                            <span>Read</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
 
                     {/* Quick Action Toolbar on Hover */}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
