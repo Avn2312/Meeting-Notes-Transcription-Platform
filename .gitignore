@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+backend/venv/
+*/venv/
+.venv/
+
+# Next.js build
+frontend/.next/
+frontend/out/
+.next/
+out/
+
+# Python cache & SQLite
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+backend/fireflies.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
