@@ -337,8 +337,37 @@ git push origin main
 
 ---
 
-## 🎯 Assumptions & Design Decisions
-1. **Audio File Handling**: Real speech-to-text audio processing is out of scope per assignment instructions. A sample 2-minute audio file is bundled and served statically by FastAPI (`/api/audio/sample.wav`), allowing the audio seekbar and transcript synchronization to be tested end-to-end.
-2. **Transcript Formats**: The ingestion engine accepts WebVTT, timestamp bracket notation (`[00:15] Speaker: Text`), colon notation (`Speaker [00:15]: Text`), raw lines, and JSON structures.
-3. **AI Post-Meeting Processing**: The backend features a transcript parsing and insight extraction engine that automatically generates executive summaries, key takeaways, chapter outlines, and actionable tasks. It also supports an interactive "Ask Fred" Q&A chat endpoint grounded in transcript content.
+## 🎯 Assumptions, Mocked Data & Technical Notes
+
+Per the assignment specification, the primary focus is on replicating the **post-meeting workspace experience**, **interactive transcript synchronization**, and **AI meeting workflows** rather than training machine learning speech models or integrating paid enterprise APIs. The following assumptions, mocked components, and architecture decisions were made:
+
+### 1. 📌 Core Assumptions
+- **Authentication**: Single-tenant workspace model assuming a default logged-in user (**Alex Vance**, Workspace Admin). Full authentication (OAuth/JWT) is explicitly designated as a placeholder per the PDF guidelines.
+- **Speech-to-Text (STT)**: Real-time speech transcription from raw microphone/video streams is out of scope. Transcripts are ingested via seeded data, pasted text, or uploaded transcript files (`.txt`, `.vtt`, `.json`).
+- **Single Source of Truth**: Meeting transcripts, action items, participants, chapters, and soundbites are persistently stored in relational tables in SQLite (`fireflies.db`) with foreign key constraints.
+- **Audio Synchronization**: Audio files serve as realistic temporal benchmarks to demonstrate exact millisecond seeking and bidirectional synchronization between media playback and transcript blocks.
+
+### 2. 🎭 Mocked Data & Simulated Features
+- **Media Playback**: 
+  - Each seeded meeting links to a real `.wav` audio track served dynamically via `/api/audio/*.wav` with `Accept-Ranges: bytes` streaming support.
+  - For user-created meetings from uploaded transcripts, the platform automatically links a default sample audio track or custom audio URL to maintain player interactivity.
+- **AI Summary & "Ask Fred" Engine**:
+  - Instead of requiring third-party paid API keys (e.g. OpenAI/Anthropic), the backend implements a deterministic, rule-based NLP extraction pipeline (`crud.py`) that identifies key takeaways, action verbs, chapter timestamps, and speaker talk-time.
+  - The "Ask Fred" chat assistant parses natural language intents (deadlines, technical decisions, speaker contributions, executive recap) and grounds responses directly in transcript excerpts.
+- **Live Call Bot Placeholder**:
+  - A modal replicates Fireflies' *"Add Notetaker to Live Call"* feature for Zoom, Google Meet, and Microsoft Teams, complete with URL validation and dispatch confirmation toasts.
+- **Integrations**:
+  - High-fidelity modals represent connections with Google Calendar, Zoom Cloud Recordings, Slack notifications, Notion exports, and HubSpot/Salesforce CRM syncing.
+
+### 3. 💡 Technical Notes & Architecture Decisions
+- **Bidirectional Audio & Transcript Sync**:
+  - Transcript segments store exact `start_time` and `end_time` in seconds.
+  - When the audio player emits `timeupdate`, the frontend identifies the active segment in $O(N)$ and triggers smooth auto-scrolling with `scrollIntoView({ behavior: 'smooth', block: 'nearest' })`.
+  - Clicking any transcript segment immediately sets `audioElement.currentTime = segment.start_time` and starts playback.
+- **Cascading Deletions**:
+  - All relational models (`Participant`, `TranscriptSegment`, `ActionItem`, `TopicChapter`, `HighlightNote`, `ChatMessage`) enforce `ondelete="CASCADE"`. Deleting a meeting cleans up all associated records atomically.
+- **Web Speech API**:
+  - Integrated browser-native SpeechSynthesis ("Voice Reader") to allow users to listen to transcript segments read aloud in real-time.
+- **Multi-Format Export**:
+  - Supports on-the-fly generation of Markdown (`.md`), Plain Text (`.txt`), formatted JSON (`.json`), and browser PDF print layouts.
 
