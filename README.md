@@ -10,8 +10,12 @@ Built as an evaluation submission for the **Scaler SDE Fullstack Assignment**.
 
 - **Aesthetic Parity**: Recreates Fireflies' signature `#7C3AED` / `#6366F1` violet-indigo palette, responsive split-pane workspace, cards, badges, and modals.
 - **Bidirectional Audio & Transcript Sync**:
+  - Distinct synthesized multi-speaker audio tracks for each meeting (`meeting_1.wav`, `meeting_2.wav`, `meeting_3.wav`, `meeting_4.wav`).
   - Clicking any transcript segment seeks the audio player to that exact millisecond.
   - Playing audio highlights the active speaker block in real-time and auto-scrolls it smoothly into view.
+- **Web Speech Voice Assistant (TTS)**:
+  - Interactive `[🔊 Read]` button on every transcript segment to read that specific speaker line aloud in the browser.
+  - `[✨ Voice Reader: ON/OFF]` toggle in the toolbar to automatically speak active segments as playback proceeds.
 - **Post-Meeting Intelligence**:
   - Executive 2-paragraph overview & structured key takeaways.
   - Interactive Action Items checklist with assignees and due dates (add, toggle, edit, and delete with persistent SQLite sync).
@@ -128,6 +132,19 @@ erDiagram
 ---
 
 ## 🚀 Quickstart & Local Setup
+
+### Single-Command Start (Recommended)
+You can start both the backend and frontend concurrently using the provided runner script:
+```bash
+./run.sh
+```
+This automatically initializes the virtual environment, installs dependencies, seeds the database, compiles styles, and launches:
+- **FastAPI Backend**: `http://127.0.0.1:8000` (API Docs at `/docs`)
+- **Next.js Frontend**: `http://localhost:3000`
+
+---
+
+### Manual Step-by-Step Setup
 
 ### Prerequisites
 - **Node.js** (v18+) & **npm**
