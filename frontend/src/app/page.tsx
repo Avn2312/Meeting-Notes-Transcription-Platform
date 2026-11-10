@@ -52,6 +52,7 @@ export default function MeetingsDashboard() {
   // Edit metadata modal
   const [editingMeeting, setEditingMeeting] = useState<MeetingListItem | null>(null);
   const [editTitleInput, setEditTitleInput] = useState<string>('');
+  const [editParticipantsInput, setEditParticipantsInput] = useState<string>('');
 
   // Dark mode
   const [darkMode, setDarkMode] = useState<boolean>(false);
@@ -132,22 +133,42 @@ export default function MeetingsDashboard() {
     e.stopPropagation();
     setEditingMeeting(meeting);
     setEditTitleInput(meeting.title);
+    setEditParticipantsInput(meeting.participants?.map((p) => p.name).join(', ') || '');
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMeeting || !editTitleInput.trim()) return;
+
+    const names = editParticipantsInput
+      .split(',')
+      .map((n) => n.trim())
+      .filter((n) => n.length > 0);
+
+    const colors = ['#6366F1', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#06B6D4'];
+    const updatedParticipants = names.map((name, idx) => ({
+      name,
+      email: `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+      avatar_color: colors[idx % colors.length],
+      talk_time_percentage: Math.round(100 / (names.length || 1))
+    }));
+
     try {
       const updated = await updateMeetingMetadata(editingMeeting.id, {
-        title: editTitleInput.trim()
+        title: editTitleInput.trim(),
+        participants: updatedParticipants
       });
       setMeetings((prev) =>
-        prev.map((m) => (m.id === updated.id ? { ...m, title: updated.title } : m))
+        prev.map((m) =>
+          m.id === updated.id
+            ? { ...m, title: updated.title, participants: updated.participants }
+            : m
+        )
       );
       setEditingMeeting(null);
-      showToast('Meeting title updated', 'success');
+      showToast('Meeting metadata updated successfully', 'success');
     } catch {
-      showToast('Failed to update title', 'error');
+      showToast('Failed to update meeting metadata', 'error');
     }
   };
 
@@ -532,33 +553,67 @@ export default function MeetingsDashboard() {
         </div>
       </main>
 
-      {/* Edit Title Modal */}
+      {/* Edit Metadata Modal */}
       {editingMeeting && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-3">
-              Rename Meeting
-            </h4>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
+              <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-violet-600" />
+                <span>Edit Meeting Metadata</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setEditingMeeting(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
             <form onSubmit={handleSaveEdit} className="space-y-4">
-              <input
-                type="text"
-                value={editTitleInput}
-                onChange={(e) => setEditTitleInput(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
-              />
-              <div className="flex justify-end gap-2">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Meeting Title
+                </label>
+                <input
+                  type="text"
+                  value={editTitleInput}
+                  onChange={(e) => setEditTitleInput(e.target.value)}
+                  placeholder="e.g. Q4 Sprint Planning"
+                  className="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Participants (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={editParticipantsInput}
+                  onChange={(e) => setEditParticipantsInput(e.target.value)}
+                  placeholder="e.g. Sarah Connor, David Miller, Elena Rostova"
+                  className="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Separate participant names with commas. Talk-time distribution and avatars will auto-recalculate.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setEditingMeeting(null)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-500 cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl text-xs font-medium text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-violet-600 text-white cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-violet-600 hover:bg-violet-700 text-white cursor-pointer shadow-md shadow-violet-600/25 transition-all"
                 >
-                  Save
+                  Save Changes
                 </button>
               </div>
             </form>

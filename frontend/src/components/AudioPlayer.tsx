@@ -60,6 +60,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   useEffect(() => {
     if (!audioRef.current) return;
     if (isPlaying) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
       audioRef.current.play().catch(() => {
         // Fallback for browsers with strict autoplay policies
       });

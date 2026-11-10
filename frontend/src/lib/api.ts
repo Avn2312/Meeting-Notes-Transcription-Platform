@@ -46,7 +46,18 @@ export async function uploadTranscript(formData: FormData): Promise<MeetingDetai
   return res.json();
 }
 
-export async function updateMeetingMetadata(id: string, data: { title?: string }): Promise<MeetingDetail> {
+export async function updateMeetingMetadata(
+  id: string,
+  data: {
+    title?: string;
+    participants?: {
+      name: string;
+      email?: string;
+      avatar_color?: string;
+      talk_time_percentage?: number;
+    }[];
+  }
+): Promise<MeetingDetail> {
   const res = await fetch(`${BASE_URL}/api/meetings/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

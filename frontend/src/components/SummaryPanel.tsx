@@ -39,6 +39,7 @@ interface SummaryPanelProps {
   onEditActionItem?: (id: string, task: string) => void;
   onDeleteActionItem: (id: string) => void;
   onSendChatMessage: (question: string) => Promise<void>;
+  onUpdateParticipants?: (names: string[]) => void;
 }
 
 export const SummaryPanel: React.FC<SummaryPanelProps> = ({
@@ -54,13 +55,16 @@ export const SummaryPanel: React.FC<SummaryPanelProps> = ({
   onAddActionItem,
   onEditActionItem,
   onDeleteActionItem,
-  onSendChatMessage
+  onSendChatMessage,
+  onUpdateParticipants
 }) => {
   const [activeTab, setActiveTab] = useState<'summary' | 'actions' | 'chapters' | 'chat'>('summary');
   const [newTaskInput, setNewTaskInput] = useState<string>('');
   const [newAssigneeInput, setNewAssigneeInput] = useState<string>('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingItemText, setEditingItemText] = useState<string>('');
+  const [isEditingParticipants, setIsEditingParticipants] = useState<boolean>(false);
+  const [participantsInput, setParticipantsInput] = useState<string>('');
   const [chatInput, setChatInput] = useState<string>('');
   const [isSendingChat, setIsSendingChat] = useState<boolean>(false);
 
@@ -198,49 +202,108 @@ export const SummaryPanel: React.FC<SummaryPanelProps> = ({
             )}
 
             {/* Speaker Talk-Time Analytics */}
-            {participants.length > 0 && (
-              <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <BarChart2 className="w-3.5 h-3.5" />
-                    <span>Speaker Talk Time</span>
-                  </h4>
-                </div>
-
-                {/* Combined Progress Bar */}
-                <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
-                  {participants.map((p, idx) => (
-                    <div
-                      key={p.id}
-                      style={{
-                        width: `${p.talk_time_percentage || 25}%`,
-                        backgroundColor: p.avatar_color || '#6366F1'
-                      }}
-                      title={`${p.name}: ${p.talk_time_percentage}%`}
-                      className="h-full transition-all"
-                    />
-                  ))}
-                </div>
-
-                {/* Individual Speaker Legend */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  {participants.map((p) => (
-                    <div key={p.id} className="flex items-center gap-2 text-xs">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: p.avatar_color || '#6366F1' }}
-                      />
-                      <span className="truncate text-slate-700 dark:text-slate-300 font-medium">
-                        {p.name}
-                      </span>
-                      <span className="ml-auto font-mono text-[11px] text-slate-400">
-                        {p.talk_time_percentage}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
+            <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <BarChart2 className="w-3.5 h-3.5" />
+                  <span>Participants & Talk Time</span>
+                </h4>
+                {onUpdateParticipants && (
+                  <button
+                    onClick={() => {
+                      if (!isEditingParticipants) {
+                        setParticipantsInput(participants.map((p) => p.name).join(', '));
+                      }
+                      setIsEditingParticipants(!isEditingParticipants);
+                    }}
+                    className="text-[11px] font-semibold text-violet-600 dark:text-violet-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    <span>{isEditingParticipants ? 'Cancel' : 'Edit'}</span>
+                  </button>
+                )}
               </div>
-            )}
+
+              {isEditingParticipants ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const names = participantsInput
+                      .split(',')
+                      .map((n) => n.trim())
+                      .filter(Boolean);
+                    if (names.length > 0 && onUpdateParticipants) {
+                      onUpdateParticipants(names);
+                      setIsEditingParticipants(false);
+                    }
+                  }}
+                  className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2"
+                >
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block">
+                    Edit Participants (comma-separated):
+                  </label>
+                  <input
+                    type="text"
+                    value={participantsInput}
+                    onChange={(e) => setParticipantsInput(e.target.value)}
+                    placeholder="e.g. Sarah Connor, David Miller"
+                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                  />
+                  <div className="flex justify-end gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingParticipants(false)}
+                      className="px-2.5 py-1 text-[11px] font-medium text-slate-500 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-3 py-1 text-[11px] font-semibold bg-violet-600 text-white rounded-lg cursor-pointer shadow-xs"
+                    >
+                      Save Participants
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                participants.length > 0 && (
+                  <>
+                    {/* Combined Progress Bar */}
+                    <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+                      {participants.map((p, idx) => (
+                        <div
+                          key={p.id}
+                          style={{
+                            width: `${p.talk_time_percentage || 25}%`,
+                            backgroundColor: p.avatar_color || '#6366F1'
+                          }}
+                          title={`${p.name}: ${p.talk_time_percentage}%`}
+                          className="h-full transition-all"
+                        />
+                      ))}
+                    </div>
+
+                    {/* Individual Speaker Legend */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      {participants.map((p) => (
+                        <div key={p.id} className="flex items-center gap-2 text-xs">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: p.avatar_color || '#6366F1' }}
+                          />
+                          <span className="truncate text-slate-700 dark:text-slate-300 font-medium">
+                            {p.name}
+                          </span>
+                          <span className="ml-auto font-mono text-[11px] text-slate-400">
+                            {p.talk_time_percentage}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )
+              )}
+            </div>
           </div>
         )}
 

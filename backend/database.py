@@ -2,7 +2,9 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fireflies.db")
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DB_FILE = os.path.join(CURRENT_DIR, "fireflies.db")
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_FILE}")
 
 engine = create_engine(
     DATABASE_URL,

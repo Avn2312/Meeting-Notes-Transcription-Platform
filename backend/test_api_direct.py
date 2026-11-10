@@ -78,6 +78,23 @@ def test_backend_end_to_end():
         new_id = created_meeting.id
         print(f"✓ Meeting creation verified: Created meeting ID {new_id}")
 
+        # 5b. Verify Meeting Metadata Update (Title and Participants)
+        updated_meeting = main.update_meeting_metadata(
+            new_id,
+            schemas.MeetingUpdate(
+                title="Design Sync & Audio Review (Updated)",
+                participants=[
+                    schemas.ParticipantCreate(name="Alice Johnson", talk_time_percentage=60.0),
+                    schemas.ParticipantCreate(name="Bob Smith", talk_time_percentage=40.0)
+                ]
+            ),
+            db=db
+        )
+        assert updated_meeting.title == "Design Sync & Audio Review (Updated)"
+        assert len(updated_meeting.participants) == 2
+        assert updated_meeting.participants[0].name in ["Alice Johnson", "Bob Smith"]
+        print(f"✓ Meeting metadata update (Title & Participants) verified")
+
         # 6. Action Items CRUD
         new_item = main.create_action_item(
             new_id,

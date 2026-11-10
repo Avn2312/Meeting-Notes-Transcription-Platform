@@ -100,6 +100,24 @@ export default function MeetingDetailPage() {
     }
   };
 
+  const handleUpdateParticipants = async (names: string[]) => {
+    if (!meeting) return;
+    const colors = ['#6366F1', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#06B6D4'];
+    const updatedParticipants = names.map((name, idx) => ({
+      name,
+      email: `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+      avatar_color: colors[idx % colors.length],
+      talk_time_percentage: Math.round(100 / (names.length || 1))
+    }));
+    try {
+      const updated = await updateMeetingMetadata(meeting.id, { participants: updatedParticipants });
+      setMeeting((prev) => (prev ? { ...prev, participants: updated.participants } : null));
+      showToast('Participants updated successfully', 'success');
+    } catch {
+      showToast('Failed to update participants', 'error');
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this meeting?')) return;
     try {
@@ -386,6 +404,9 @@ export default function MeetingDetailPage() {
             segments={meeting.transcript_segments}
             currentTime={currentTime}
             onSeek={handleSeek}
+            onTimeUpdate={(t) => setCurrentTime(t)}
+            isPlaying={isPlaying}
+            onPlayPauseToggle={(p) => setIsPlaying(p)}
             highlights={meeting.highlights}
             onAddHighlight={handleAddHighlight}
             onDeleteHighlight={handleDeleteHighlight}
@@ -408,6 +429,7 @@ export default function MeetingDetailPage() {
             onEditActionItem={handleEditActionItem}
             onDeleteActionItem={handleDeleteActionItem}
             onSendChatMessage={handleSendChatMessage}
+            onUpdateParticipants={handleUpdateParticipants}
           />
         </div>
       </div>

@@ -21,6 +21,9 @@ interface InteractiveTranscriptProps {
   segments: TranscriptSegment[];
   currentTime: number;
   onSeek: (time: number) => void;
+  onTimeUpdate?: (time: number) => void;
+  isPlaying?: boolean;
+  onPlayPauseToggle?: (playing: boolean) => void;
   highlights: HighlightNote[];
   onAddHighlight: (data: { selected_text: string; note?: string; color?: string; segment_id?: string }) => void;
   onDeleteHighlight?: (id: string) => void;
@@ -30,6 +33,9 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
   segments,
   currentTime,
   onSeek,
+  onTimeUpdate,
+  isPlaying = false,
+  onPlayPauseToggle,
   highlights,
   onAddHighlight,
   onDeleteHighlight
@@ -45,7 +51,13 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
   const [autoVoiceReader, setAutoVoiceReader] = useState<boolean>(false);
 
   const segmentRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-  const lastSpokenSegmentId = useRef<string | null>(null);
+  const speechIntervalRef = useRef<any>(null);
+  const autoReaderActiveRef = useRef<boolean>(false);
+
+  // Keep ref in sync for callbacks
+  useEffect(() => {
+    autoReaderActiveRef.current = autoVoiceReader;
+  }, [autoVoiceReader]);
 
   // Unique speakers
   const speakers = useMemo(() => {
@@ -54,12 +66,22 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
     return Array.from(set);
   }, [segments]);
 
-  // Current active segment based on audio currentTime
+  // Current active segment based on audio currentTime with gap protection
   const activeSegmentId = useMemo(() => {
-    const found = segments.find(
-      (s) => currentTime >= s.start_time && currentTime <= s.end_time
-    );
-    return found ? found.id : null;
+    if (!segments || segments.length === 0) return null;
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      const nextSeg = segments[i + 1];
+      const nextStart = nextSeg ? nextSeg.start_time : seg.end_time + 2.0;
+      if (currentTime >= seg.start_time && currentTime < nextStart) {
+        return seg.id;
+      }
+    }
+    const last = segments[segments.length - 1];
+    if (currentTime >= last.start_time) {
+      return last.id;
+    }
+    return segments[0]?.id || null;
   }, [segments, currentTime]);
 
   // Auto-scroll to active segment smoothly if playing
@@ -84,28 +106,50 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
     });
   }, [segments, selectedSpeaker, searchTerm]);
 
-  // Stop speaking on unmount
+  // Stop speaking and clear interval on unmount
   useEffect(() => {
     return () => {
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
+      if (speechIntervalRef.current) {
+        clearInterval(speechIntervalRef.current);
+      }
     };
   }, []);
 
-  // Web Speech API Voice Assistant
+  // Web Speech API Voice Assistant in lockstep timeline sync
   const speakSegment = (segment: TranscriptSegment) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
+    // Pause native audio player to avoid competing voices
+    if (onPlayPauseToggle && isPlaying) {
+      onPlayPauseToggle(false);
+    }
+
+    // Toggle off if already speaking this segment
     if (speakingSegmentId === segment.id) {
       window.speechSynthesis.cancel();
+      if (speechIntervalRef.current) clearInterval(speechIntervalRef.current);
       setSpeakingSegmentId(null);
       return;
     }
 
     window.speechSynthesis.cancel();
+    if (speechIntervalRef.current) clearInterval(speechIntervalRef.current);
+
+    // Immediately synchronize timeline position
+    onSeek(segment.start_time);
+    if (onTimeUpdate) {
+      onTimeUpdate(segment.start_time);
+    }
+
     const utterance = new SpeechSynthesisUtterance(segment.text);
-    utterance.rate = 1.0;
+    const timelineDuration = Math.max(1.0, segment.end_time - segment.start_time);
+    const words = segment.text.trim().split(/\s+/).length;
+    const naturalDuration = Math.max(1.0, words / 2.7);
+    const speechRate = Math.min(1.35, Math.max(0.85, naturalDuration / timelineDuration));
+    utterance.rate = speechRate;
 
     const voices = window.speechSynthesis.getVoices();
     const enVoice = voices.find(
@@ -121,27 +165,53 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
 
     utterance.onstart = () => {
       setSpeakingSegmentId(segment.id);
+      const startWallTime = Date.now();
+
+      // Smoothly advance timeline in real-time with spoken words
+      speechIntervalRef.current = setInterval(() => {
+        const elapsedSec = (Date.now() - startWallTime) / 1000;
+        const progress = Math.min(1.0, elapsedSec / timelineDuration);
+        const interpolatedTime = segment.start_time + progress * (segment.end_time - segment.start_time);
+        if (onTimeUpdate) {
+          onTimeUpdate(Math.min(segment.end_time, interpolatedTime));
+        }
+      }, 50);
     };
+
     utterance.onend = () => {
+      if (speechIntervalRef.current) {
+        clearInterval(speechIntervalRef.current);
+      }
+      if (onTimeUpdate) {
+        onTimeUpdate(segment.end_time);
+      }
       setSpeakingSegmentId(null);
+
+      // If Auto Voice Reader mode is active, proceed to next segment
+      if (autoReaderActiveRef.current) {
+        const currIndex = segments.findIndex((s) => s.id === segment.id);
+        if (currIndex >= 0 && currIndex + 1 < segments.length) {
+          const nextSeg = segments[currIndex + 1];
+          setTimeout(() => {
+            if (autoReaderActiveRef.current) {
+              speakSegment(nextSeg);
+            }
+          }, 350);
+        } else {
+          setAutoVoiceReader(false);
+        }
+      }
     };
+
     utterance.onerror = () => {
+      if (speechIntervalRef.current) {
+        clearInterval(speechIntervalRef.current);
+      }
       setSpeakingSegmentId(null);
     };
 
     window.speechSynthesis.speak(utterance);
   };
-
-  // Auto Voice Reader for active segment when toggle is ON
-  useEffect(() => {
-    if (!autoVoiceReader || !activeSegmentId) return;
-    if (lastSpokenSegmentId.current === activeSegmentId) return;
-    const seg = segments.find((s) => s.id === activeSegmentId);
-    if (seg) {
-      lastSpokenSegmentId.current = activeSegmentId;
-      speakSegment(seg);
-    }
-  }, [autoVoiceReader, activeSegmentId, segments]);
 
   // Helper to format timestamp
   const formatTime = (secs: number) => {
@@ -217,9 +287,19 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
             onClick={() => {
               const nextVal = !autoVoiceReader;
               setAutoVoiceReader(nextVal);
-              if (!nextVal && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
+              if (!nextVal) {
+                if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                  window.speechSynthesis.cancel();
+                }
+                if (speechIntervalRef.current) clearInterval(speechIntervalRef.current);
                 setSpeakingSegmentId(null);
+              } else {
+                const target =
+                  segments.find((s) => currentTime >= s.start_time && currentTime < s.end_time) ||
+                  segments[0];
+                if (target) {
+                  speakSegment(target);
+                }
               }
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
@@ -227,7 +307,7 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
                 ? 'bg-violet-600 border-violet-600 text-white shadow-xs'
                 : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-violet-400'
             }`}
-            title="Auto-read each segment aloud with Voice Assistant"
+            title="Auto-read each segment aloud with Voice Assistant in timeline sync"
           >
             <Sparkles className={`w-3.5 h-3.5 ${autoVoiceReader ? 'animate-spin text-amber-300' : 'text-violet-500'}`} />
             <span>Voice Reader: {autoVoiceReader ? 'ON' : 'OFF'}</span>
@@ -335,7 +415,14 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
                         <Highlighter className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => onSeek(segment.start_time)}
+                        onClick={() => {
+                          onSeek(segment.start_time);
+                          if (autoVoiceReader) {
+                            speakSegment(segment);
+                          } else if (onPlayPauseToggle && !isPlaying) {
+                            onPlayPauseToggle(true);
+                          }
+                        }}
                         title="Play from here"
                         className="text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:underline cursor-pointer"
                       >
@@ -346,7 +433,12 @@ export const InteractiveTranscript: React.FC<InteractiveTranscriptProps> = ({
 
                   {/* Transcript Paragraph */}
                   <p
-                    onClick={() => onSeek(segment.start_time)}
+                    onClick={() => {
+                      onSeek(segment.start_time);
+                      if (autoVoiceReader) {
+                        speakSegment(segment);
+                      }
+                    }}
                     className="text-sm leading-relaxed text-slate-700 dark:text-slate-300 cursor-pointer selection:bg-violet-200 dark:selection:bg-violet-900"
                   >
                     {renderHighlightedText(segment.text, searchTerm)}
