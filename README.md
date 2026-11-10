@@ -6,6 +6,13 @@ Built as an evaluation submission for the **Scaler SDE Fullstack Assignment**.
 
 ---
 
+## 🔗 Links & Live Deployment
+- **Live Demo**: [https://fireflies-clone-platform.vercel.app](https://fireflies-clone-platform.vercel.app) *(Deploy on Vercel and paste your live URL here)*
+- **Backend API Docs**: [https://fireflies-api.onrender.com/docs](https://fireflies-api.onrender.com/docs) *(Deploy on Render and paste your live URL here)*
+- **GitHub Repository**: [https://github.com/Avn2312/Meeting-Notes-Transcription-Platform](https://github.com/Avn2312/Meeting-Notes-Transcription-Platform)
+
+---
+
 ## 📸 Overview & Key Highlights
 
 - **Aesthetic Parity**: Recreates Fireflies' signature `#7C3AED` / `#6366F1` violet-indigo palette, responsive split-pane workspace, cards, badges, and modals.
@@ -276,17 +283,57 @@ This tests:
 
 ---
 
-## 🌐 Deployment Instructions
+## 🌐 Deployment Guide (Render + Vercel)
 
-### Option 1: Frontend on Vercel + Backend on Render / Railway
-1. **Backend (Render / Railway)**:
-   - Root directory: `backend/`
-   - Build command: `pip install -r requirements.txt && python seed.py`
-   - Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-2. **Frontend (Vercel)**:
-   - Root directory: `frontend/`
-   - Framework preset: `Next.js`
-   - Environment Variable: `NEXT_PUBLIC_API_URL=https://<your-backend-url>`
+The project includes pre-configured [render.yaml](file:///Users/avn2312/Desktop/Scalar%20AI%20Project/render.yaml) and [frontend/vercel.json](file:///Users/avn2312/Desktop/Scalar%20AI%20Project/frontend/vercel.json) for 1-click cloud deployments.
+
+### Part 1: Deploy Backend to Render (Free)
+1. Go to [render.com](https://render.com) and sign in with GitHub.
+2. Click **New +** → **Web Service**.
+3. Select your repository: `Meeting-Notes-Transcription-Platform`.
+4. Configure the service settings:
+   - **Name**: `fireflies-api` (or your choice)
+   - **Region**: Choose the closest region (e.g. `Frankfurt`, `Oregon`, `Singapore`)
+   - **Root Directory**: `backend`
+   - **Runtime**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt && python seed.py`
+   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - **Instance Type**: `Free`
+5. Click **Create Web Service**.
+6. Once deployed (typically ~90 seconds), copy your live backend URL (e.g. `https://fireflies-api-xxxx.onrender.com`).
+   - You can verify the API is live by opening: `https://fireflies-api-xxxx.onrender.com/docs`.
+
+---
+
+### Part 2: Deploy Frontend to Vercel (Free)
+1. Go to [vercel.com](https://vercel.com) and sign in with GitHub.
+2. Click **Add New...** → **Project**.
+3. Import `Meeting-Notes-Transcription-Platform`.
+4. Configure the project:
+   - **Framework Preset**: `Next.js`
+   - **Root Directory**: Click *Edit* and select **`frontend`**
+   - **Build Command**: Leave default (`npm run build` auto-runs CSS compilation and Next.js build)
+   - **Environment Variables**:
+     - Key: `NEXT_PUBLIC_API_URL`
+     - Value: `https://fireflies-api-xxxx.onrender.com` *(your Render backend URL from Part 1, without trailing slash)*
+5. Click **Deploy**.
+6. Once deployment finishes (~60 seconds), Vercel will provide your live URL (e.g. `https://meeting-notes-transcription-platform.vercel.app`).
+
+---
+
+### Part 3: Update `README.md` with Live URLs
+After deploying, replace the placeholder links at the top of `README.md` with your actual live URLs:
+```markdown
+## 🔗 Links & Live Deployment
+- **Live Demo**: https://<your-vercel-domain>.vercel.app
+- **Backend API Docs**: https://<your-render-domain>.onrender.com/docs
+```
+Commit and push:
+```bash
+git add README.md
+git commit -m "docs: Update live deployment URLs"
+git push origin main
+```
 
 ---
 
