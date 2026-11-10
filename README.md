@@ -7,8 +7,8 @@ Built as an evaluation submission for the **Scaler SDE Fullstack Assignment**.
 ---
 
 ## 🔗 Links & Live Deployment
-- **Live Demo**: [https://fireflies-clone-platform.vercel.app](https://fireflies-clone-platform.vercel.app) *(Deploy on Vercel and paste your live URL here)*
-- **Backend API Docs**: [https://fireflies-api.onrender.com/docs](https://fireflies-api.onrender.com/docs) *(Deploy on Render and paste your live URL here)*
+- **Live Demo**: [https://frontend-n257.vercel.app/](https://fireflies-clone-platform.vercel.app) *(Deploy on Vercel and paste your live URL here)*
+- **Backend API Docs**: [https://meeting-notes-transcription-platform-nfnz.onrender.com/docs](https://fireflies-api.onrender.com/docs) *(Deploy on Render and paste your live URL here)*
 - **GitHub Repository**: [https://github.com/Avn2312/Meeting-Notes-Transcription-Platform](https://github.com/Avn2312/Meeting-Notes-Transcription-Platform)
 
 ---
